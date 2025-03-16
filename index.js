@@ -11,7 +11,11 @@ const {
   verifyRefreshToken,
   revokedRefreshToken,
 } = require("./JWT-service");
-const { authenticateUser, authorizeRoles } = require("./auth-middleware");
+const {
+  authorizeRoles,
+  checkRole,
+  authenticateToken,
+} = require("./auth-middleware");
 
 const user = process.env.USER;
 const database = process.env.DATABASE;
@@ -24,10 +28,14 @@ app.use(
   cors({
     origin: ["http://localhost:3000", "http://localhost:3011"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Set-Cookie"],
   })
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 
 const pool = new Pool({
   user,
@@ -74,9 +82,17 @@ app.post("/api/users/register", async (req, res) => {
       maxAge: parseInt(process.env.REFRESH_TOKEN_COOKIE_MAX_AGE),
     });
 
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
+    });
+
     res.status(201).json({
       message: "User registered successfully",
       accessToken,
+      success: true,
       user: {
         id: user.id,
         email: user.email,
@@ -114,15 +130,24 @@ app.post("/api/users/login", async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = await generateRefreshToken(user.id);
 
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
+    });
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: "production",
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
+      path: "/",
       maxAge: parseInt(process.env.REFRESH_TOKEN_COOKIE_MAX_AGE),
     });
 
     res.status(200).json({
-      message: "Login successful",
+      success: true,
       accessToken,
       user: {
         id: user.id,
@@ -159,9 +184,18 @@ app.post("/api/users/refresh-token", async (req, res) => {
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
-      secure: "production",
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
+      path: "/",
       maxAge: parseInt(process.env.REFRESH_TOKEN_COOKIE_MAX_AGE),
+    });
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
     });
 
     res.status(200).json({
@@ -191,6 +225,7 @@ app.post("/api/users/logout", async (req, res) => {
   }
 
   res.clearCookie("refreshToken");
+  res.clearCookie("accessToken");
 
   res.status(200).json({ message: "Logged out successfully" });
 });
@@ -198,7 +233,7 @@ app.post("/api/users/logout", async (req, res) => {
 // Маршрутизация для админ страницы
 app.get(
   "/api/users/admin",
-  authenticateUser,
+  authenticateToken,
   authorizeRoles("admin"),
   async (req, res) => {
     try {
@@ -212,26 +247,8 @@ app.get(
   }
 );
 
-// Маршрутизация для обычных пользователей
-app.get("/api/users/profile", authenticateUser, async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT id,email,role FROM users WHERE id = $1",
-      [req.user.id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json(result.rows[0]);
-  } catch (error) {
-    console.error("Error get user profile", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-//Проверка текущего пользователя
-app.get("/api/users/me", authenticateUser, async (req, res) => {
+// Проверка текущего пользователя
+app.get("/api/users/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, email, role FROM users WHERE id = $1",

@@ -1,18 +1,26 @@
-const { verifyToken } = require("./JWT-service");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
-const authenticateUser = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+// Middleware для проверки токена из куки
+const authenticateToken = (req, res, next) => {
+  const accessToken = req.cookies.accessToken;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Authentication required" });
+  if (!accessToken && req.headers.authorization) {
+    const authHeader = req.headers.authorization;
+    if (authHeader.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+    }
   }
 
-  const token = authHeader.split(" ")[1];
+  if (!accessToken) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required",
+    });
+  }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
@@ -36,4 +44,4 @@ const authorizeRoles = (...roles) => {
   };
 };
 
-module.exports = { authenticateUser, authorizeRoles };
+module.exports = { authenticateToken, authorizeRoles };
