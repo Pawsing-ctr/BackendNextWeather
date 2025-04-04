@@ -3,7 +3,6 @@ const cors = require("cors");
 const { Pool } = require("pg");
 require("dotenv").config();
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const {
   generateAccessToken,
@@ -11,11 +10,7 @@ const {
   verifyRefreshToken,
   revokedRefreshToken,
 } = require("./JWT-service");
-const {
-  authorizeRoles,
-  checkRole,
-  authenticateToken,
-} = require("./auth-middleware");
+const { authorizeRoles, authenticateToken } = require("./auth-middleware");
 
 const user = process.env.USER;
 const database = process.env.DATABASE;
@@ -97,6 +92,7 @@ app.post("/api/users/register", async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        year: user.year,
       },
     });
   } catch (error) {
@@ -111,7 +107,7 @@ app.post("/api/users/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT id, email, password, role FROM users WHERE email = $1",
+      "SELECT id, email, password, role, year FROM users WHERE email = $1",
       [email]
     );
 
@@ -153,6 +149,7 @@ app.post("/api/users/login", async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        year: user.year,
       },
     });
   } catch (error) {
@@ -204,6 +201,7 @@ app.post("/api/users/refresh-token", async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        year: user.year,
       },
     });
   } catch (error) {
@@ -251,7 +249,7 @@ app.get(
 app.get("/api/users/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, role FROM users WHERE id = $1",
+      "SELECT id, email, role, year FROM users WHERE id = $1",
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -265,11 +263,82 @@ app.get("/api/users/me", authenticateToken, async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        year: user.year,
       },
     });
   } catch (error) {
     console.error("Error get user", error);
     res.status(500).json({ message: "Server error:", error: error.message });
+  }
+});
+
+app.put("/api/users/update", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { email, newPassword } = req.body;
+
+  try {
+    let passwordHash;
+
+    if (newPassword) {
+      const result = await pool.query(
+        "SELECT password FROM users WHERE id = $1",
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Пользователь не найдет" });
+      }
+
+      const currentHashedPassword = result.rows[0].password;
+
+      const isSamePassword = await bcrypt.compare(
+        newPassword,
+        currentHashedPassword
+      );
+
+      if (isSamePassword) {
+        return res
+          .status(400)
+          .json({ message: "Новый пароль не должен совпадать со старым" });
+      }
+
+      passwordHash = await bcrypt.hash(newPassword, 7);
+    }
+
+    const updateQuery = `
+      UPDATE users SET
+        email = COALESCE($1, email),
+        password = COALESCE($2, password)
+      WHERE id = $3
+      RETURNING id, email
+    `;
+
+    const result = await pool.query(updateQuery, [
+      email || null,
+      passwordHash || null,
+      userId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (passwordHash) {
+      res.clearCookie("accessToken");
+      res.clearCookie("refreshToken");
+      res.clearCookie("userBirthYear");
+      return res
+        .status(200)
+        .json({ message: "Пароль обновлён. Войдите заново." });
+    }
+
+    res.status(200).json({
+      message: "User data updated successfully",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating user data:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 });
 
