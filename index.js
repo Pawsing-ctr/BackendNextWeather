@@ -11,6 +11,7 @@ const {
   revokedRefreshToken,
 } = require("./JWT-service");
 const { authorizeRoles, authenticateToken } = require("./auth-middleware");
+const multer = require("multer");
 
 const user = process.env.USER;
 const database = process.env.DATABASE;
@@ -31,6 +32,8 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const pool = new Pool({
   user,
@@ -224,6 +227,7 @@ app.post("/api/users/logout", async (req, res) => {
 
   res.clearCookie("refreshToken");
   res.clearCookie("accessToken");
+  res.clearCookie("userBirthYear");
 
   res.status(200).json({ message: "Logged out successfully" });
 });
@@ -339,6 +343,120 @@ app.put("/api/users/update", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Error updating user data:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
+  }
+});
+
+// Получить все новости
+app.get("/api/news", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, title, description, created_at FROM news"
+    );
+    const newsWithImages = await Promise.all(
+      result.rows.map(async (item) => {
+        const imageResult = await pool.query(
+          "SELECT image FROM news WHERE id = $1",
+          [item.id]
+        );
+        const image = imageResult.rows[0]?.image;
+        return {
+          ...item,
+          imageUrl: image
+            ? `data:image/jpeg;base64,${Buffer.from(image).toString("base64")}`
+            : null,
+        };
+      })
+    );
+    res.json(newsWithImages);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка при получении данных новостей" });
+  }
+});
+
+//Получить (определенную) новость по id
+app.get("/news/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query("SELECT * FROM news WHERE id = $1", [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Новость не найдена" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка при получении данных" });
+  }
+});
+
+//Получить картинку новости
+app.get("/news/:id/image", async (req, res) => {
+  const { id } = req.params;
+  const result = await pool.query("SELECT image FROM news WHERE id = $1", [id]);
+  const image = result.rows[0]?.image;
+
+  if (!image) {
+    return res.status(404).json({ message: "Картинка не найдена" });
+  }
+
+  res.setHeader("Content-Type", "image/jpeg");
+  res.json(image);
+});
+
+//Добавить новость
+app.post("/api/news", upload.single("image"), async (req, res) => {
+  console.log("req.file:", req.file);
+  const { title, description } = req.body;
+  const imageBuffer = req.file ? req.file.buffer : null;
+
+  try {
+    const result = await pool.query(
+      "INSERT INTO news (title, description, image) VALUES ($1,$2,$3) RETURNING *",
+      [title, description, imageBuffer]
+    );
+    res.status(201).json({
+      message: "Новость создана",
+      news: result.rows[0],
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка при добавлении новости" });
+  }
+});
+
+//Обновить новость
+app.put("/api/news/:id", async (req, res) => {
+  const { id } = req.params;
+  const { title, description } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE news SET title = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
+      [title, description, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Новость не найдена" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка при обновлении новости" });
+  }
+});
+
+app.delete("/api/news/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM news WHERE id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Новость не найдена" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка при удалении новости" });
   }
 });
 
