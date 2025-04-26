@@ -16,6 +16,8 @@ const multer = require("multer");
 const user = process.env.USER;
 const database = process.env.DATABASE;
 const password = process.env.PASSWORD;
+const host = process.env.HOST;
+const port = process.env.PORT;
 
 const app = express();
 const PORT = 3011;
@@ -24,7 +26,7 @@ app.use(
   cors({
     origin: ["http://localhost:3000", "http://localhost:3011"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Set-Cookie"],
   })
@@ -37,13 +39,16 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const pool = new Pool({
   user,
-  host: "localhost",
+  host,
   database,
   password,
-  port: 5432,
+  port,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-// -------- функцию для регистрации --------
+// -------- эндпоинт для регистрации --------
 app.post("/api/users/register", async (req, res) => {
   const { email, password, day, month, year, role = "user" } = req.body;
 
@@ -104,7 +109,7 @@ app.post("/api/users/register", async (req, res) => {
   }
 });
 
-// --------- фукнция для логина ------------
+// --------- эндпоинт для логина ------------
 app.post("/api/users/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -161,7 +166,7 @@ app.post("/api/users/login", async (req, res) => {
   }
 });
 
-// -------------- функция обновления токена --------------
+// -------------- эндпоинт обновления токена --------------
 app.post("/api/users/refresh-token", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
@@ -213,7 +218,7 @@ app.post("/api/users/refresh-token", async (req, res) => {
   }
 });
 
-// --------------- функция выхода пользователя -----------
+// --------------- эндпоинт выхода пользователя -----------
 app.post("/api/users/logout", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
@@ -232,22 +237,43 @@ app.post("/api/users/logout", async (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 });
 
-// Маршрутизация для админ страницы
-app.get(
-  "/api/users/admin",
-  authenticateToken,
-  authorizeRoles("admin"),
-  async (req, res) => {
-    try {
-      const result = await pool.query("SELECT id, email, role FROM users");
+// ------ энпоинт для добавления пользователя в админа -----
+app.patch("/api/users/make-admin", async (req, res) => {
+  const { email, password } = req.body;
 
-      res.status(200).json(result.rows);
-    } catch (error) {
-      console.error("Error get users", error);
-      res.status(500).json({ message: "Server error", error: error.message });
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Пользователь не найден" });
     }
+
+    const user = result.rows[0];
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Неверный пароль" });
+    }
+
+    if (user.role === "admin") {
+      return res
+        .status(400)
+        .json({ message: "Пользователь уже является админом" });
+    }
+
+    await pool.query("UPDATE users SET role = 'admin' WHERE email = $1", [
+      email,
+    ]);
+
+    res.status(200).json({ message: "Пользователь теперь админ" });
+  } catch (error) {
+    console.error("Ошибка при выдаче прав администратора:", error);
+    res.status(500).json({ message: "Ошибка сервера", error: error.message });
   }
-);
+});
 
 // Проверка текущего пользователя
 app.get("/api/users/me", authenticateToken, async (req, res) => {
@@ -389,23 +415,8 @@ app.get("/news/:id", async (req, res) => {
   }
 });
 
-//Получить картинку новости
-app.get("/news/:id/image", async (req, res) => {
-  const { id } = req.params;
-  const result = await pool.query("SELECT image FROM news WHERE id = $1", [id]);
-  const image = result.rows[0]?.image;
-
-  if (!image) {
-    return res.status(404).json({ message: "Картинка не найдена" });
-  }
-
-  res.setHeader("Content-Type", "image/jpeg");
-  res.json(image);
-});
-
 //Добавить новость
 app.post("/api/news", upload.single("image"), async (req, res) => {
-  console.log("req.file:", req.file);
   const { title, description } = req.body;
   const imageBuffer = req.file ? req.file.buffer : null;
 
@@ -424,25 +435,7 @@ app.post("/api/news", upload.single("image"), async (req, res) => {
   }
 });
 
-//Обновить новость
-app.put("/api/news/:id", async (req, res) => {
-  const { id } = req.params;
-  const { title, description } = req.body;
-  try {
-    const result = await pool.query(
-      "UPDATE news SET title = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
-      [title, description, id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Новость не найдена" });
-    }
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Ошибка при обновлении новости" });
-  }
-});
-
+// Удалить новость
 app.delete("/api/news/:id", async (req, res) => {
   const { id } = req.params;
   try {
