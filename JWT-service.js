@@ -6,13 +6,15 @@ const { v4: uuidv4 } = require("uuid");
 const user = process.env.USER;
 const database = process.env.DATABASE;
 const password = process.env.PASSWORD;
+const host = process.env.HOST;
+const port = process.env.PORT;
 
 const pool = new Pool({
   user,
-  host: "localhost",
+  host,
   database,
   password,
-  port: 5432,
+  port,
 });
 
 const generateAccessToken = (user) => {

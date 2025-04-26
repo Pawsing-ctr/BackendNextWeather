@@ -20,11 +20,11 @@ const host = process.env.HOST;
 const port = process.env.PORT;
 
 const app = express();
-const PORT = 3011;
+const PORT = 5000;
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3011"],
+    origin: ["https://backendnextweather-production.up.railway.app"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -454,5 +454,9 @@ app.delete("/api/news/:id", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Сервер запущен: http://localhost:${PORT}`);
+  const url = process.env.RAILWAY_STATIC_URL
+    ? `${process.env.RAILWAY_STATIC_URL}`
+    : `http://localhost:${PORT}`;
+
+  console.log(`Сервер запущен: ${url}`);
 });
