@@ -17,10 +17,10 @@ const user = process.env.USER;
 const database = process.env.DATABASE;
 const password = process.env.PASSWORD;
 const host = process.env.HOST;
-const port = process.env.PORT;
+const dbPort = process.env.DB_PORT;
+const serverPort = process.env.SERVER_PORT || 5000;
 
 const app = express();
-const PORT = 5000;
 
 app.use(
   cors({
@@ -42,7 +42,7 @@ const pool = new Pool({
   host,
   database,
   password,
-  port,
+  dbPort,
   ssl: {
     rejectUnauthorized: false,
   },
@@ -453,10 +453,6 @@ app.delete("/api/news/:id", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  const url = process.env.RAILWAY_STATIC_URL
-    ? `${process.env.RAILWAY_STATIC_URL}`
-    : `http://localhost:${PORT}`;
-
-  console.log(`Сервер запущен: ${url}`);
+app.listen(serverPort, () => {
+  console.log(`Сервер запущен на порту ${serverPort}`);
 });
