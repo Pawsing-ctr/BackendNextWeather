@@ -54,6 +54,7 @@ app.post("/users/register", async (req, res) => {
   const { email, password, day, month, year, role = "user" } = req.body;
 
   const validRole = role === "admin" ? "admin" : "user";
+  console.log(0);
 
   try {
     const existingUser = await pool.query(
