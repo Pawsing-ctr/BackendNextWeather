@@ -60,24 +60,30 @@ app.post("/users/register", async (req, res) => {
       "SELECT id FROM users WHERE email = $1",
       [email]
     );
+    console.log(existingUser);
+    console.log(existingUser?.rows?.length);
 
-    if (existingUser.rows.length > 0) {
+    if (existingUser?.rows?.length > 0) {
       return res.status(400).json({
         message: "User with this email already exists",
       });
     }
 
     const passwordHash = await bcrypt.hash(password, 7);
-
+    console.log(1);
     const result = await pool.query(
       "INSERT INTO users (email, password, day, month, year, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, day, month, year, role",
       [email, passwordHash, day, month, year, validRole]
     );
+    console.log(result);
+    console.log(result.rows[0]);
 
     const user = result.rows[0];
 
     const accessToken = generateAccessToken(user);
     const refreshToken = await generateRefreshToken(user.id);
+
+    console.log(2);
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -92,6 +98,7 @@ app.post("/users/register", async (req, res) => {
       sameSite: "strict",
       maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
     });
+    console.log(3);
 
     res.status(201).json({
       message: "User registered successfully",
