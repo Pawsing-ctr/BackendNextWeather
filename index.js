@@ -49,7 +49,7 @@ const pool = new Pool({
 });
 
 // -------- эндпоинт для регистрации --------
-app.post("/api/users/register", async (req, res) => {
+app.post("/users/register", async (req, res) => {
   const { email, password, day, month, year, role = "user" } = req.body;
 
   const validRole = role === "admin" ? "admin" : "user";
@@ -110,7 +110,7 @@ app.post("/api/users/register", async (req, res) => {
 });
 
 // --------- эндпоинт для логина ------------
-app.post("/api/users/login", async (req, res) => {
+app.post("/users/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -167,7 +167,7 @@ app.post("/api/users/login", async (req, res) => {
 });
 
 // -------------- эндпоинт обновления токена --------------
-app.post("/api/users/refresh-token", async (req, res) => {
+app.post("/users/refresh-token", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
@@ -219,7 +219,7 @@ app.post("/api/users/refresh-token", async (req, res) => {
 });
 
 // --------------- эндпоинт выхода пользователя -----------
-app.post("/api/users/logout", async (req, res) => {
+app.post("/users/logout", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (refreshToken) {
@@ -238,7 +238,7 @@ app.post("/api/users/logout", async (req, res) => {
 });
 
 // ------ энпоинт для добавления пользователя в админа -----
-app.patch("/api/users/make-admin", async (req, res) => {
+app.patch("/users/make-admin", async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -276,7 +276,7 @@ app.patch("/api/users/make-admin", async (req, res) => {
 });
 
 // Проверка текущего пользователя
-app.get("/api/users/me", authenticateToken, async (req, res) => {
+app.get("/users/me", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, email, role, year FROM users WHERE id = $1",
@@ -302,7 +302,7 @@ app.get("/api/users/me", authenticateToken, async (req, res) => {
   }
 });
 
-app.put("/api/users/update", authenticateToken, async (req, res) => {
+app.put("/users/update", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const { email, newPassword } = req.body;
 
@@ -373,7 +373,7 @@ app.put("/api/users/update", authenticateToken, async (req, res) => {
 });
 
 // Получить все новости
-app.get("/api/news", async (req, res) => {
+app.get("/news", async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, title, description, created_at FROM news"
@@ -416,7 +416,7 @@ app.get("/news/:id", async (req, res) => {
 });
 
 //Добавить новость
-app.post("/api/news", upload.single("image"), async (req, res) => {
+app.post("/news", upload.single("image"), async (req, res) => {
   const { title, description } = req.body;
   const imageBuffer = req.file ? req.file.buffer : null;
 
@@ -436,7 +436,7 @@ app.post("/api/news", upload.single("image"), async (req, res) => {
 });
 
 // Удалить новость
-app.delete("/api/news/:id", async (req, res) => {
+app.delete("/news/:id", async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
