@@ -14,10 +14,11 @@ const { authorizeRoles, authenticateToken } = require("./auth-middleware");
 const multer = require("multer");
 
 const user = process.env.USER;
-const database = process.env.DATABASE;
 const password = process.env.PASSWORD;
 const host = process.env.HOST;
+const database = process.env.DATABASE;
 const dbPort = process.env.DB_PORT;
+
 const serverPort = process.env.SERVER_PORT || 5000;
 
 const app = express();
@@ -42,7 +43,7 @@ const pool = new Pool({
   host,
   database,
   password,
-  dbPort,
+  port: dbPort,
   ssl: {
     rejectUnauthorized: false,
   },
