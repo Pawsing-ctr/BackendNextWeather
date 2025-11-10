@@ -75,6 +75,10 @@ app.post("/users/register", async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = await generateRefreshToken(user.id);
 
+    console.log("Setting cookies:");
+    console.log("AccessToken:", accessToken);
+    console.log("RefreshToken:", refreshToken);
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -183,10 +187,6 @@ app.post("/users/refresh-token", async (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const newRefreshToken = await generateRefreshToken(user.id);
-
-    console.log("Setting cookies:");
-    console.log("AccessToken:", accessToken);
-    console.log("RefreshToken:", refreshToken);
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
