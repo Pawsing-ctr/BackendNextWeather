@@ -82,14 +82,14 @@ app.post("/users/register", async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: parseInt(process.env.REFRESH_TOKEN_COOKIE_MAX_AGE),
     });
 
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
     });
 
