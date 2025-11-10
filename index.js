@@ -70,8 +70,6 @@ app.post("/users/register", async (req, res) => {
       [email, passwordHash, day, month, year, validRole]
     );
 
-    console.log("Password:", password);
-
     const user = result.rows[0];
 
     const accessToken = generateAccessToken(user);
@@ -185,6 +183,10 @@ app.post("/users/refresh-token", async (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const newRefreshToken = await generateRefreshToken(user.id);
+
+    console.log("Setting cookies:");
+    console.log("AccessToken:", accessToken);
+    console.log("RefreshToken:", refreshToken);
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,

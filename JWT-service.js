@@ -29,7 +29,6 @@ const generateRefreshToken = async (userId) => {
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   try {
-    console.log("Saving refresh token for user:", userId, refreshToken);
     await pool.query(
       "INSERT INTO refresh_tokens (user_id,token,expires_at, revoked) VALUES ($1,$2,$3, false)",
       [userId, refreshToken, expiresAt]
