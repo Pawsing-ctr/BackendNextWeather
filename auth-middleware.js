@@ -3,7 +3,7 @@ require("dotenv").config();
 
 // Middleware для проверки токена из куки
 const authenticateToken = (req, res, next) => {
-  const accessToken = req.cookies.accessToken;
+  let accessToken = req.cookies.accessToken;
 
   if (!accessToken && req.headers.authorization) {
     const authHeader = req.headers.authorization;
