@@ -3,18 +3,11 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const { v4: uuidv4 } = require("uuid");
 
-const user = process.env.USER;
-const database = process.env.DATABASE;
-const password = process.env.PASSWORD;
-const host = process.env.HOST;
-const port = process.env.PORT;
-
 const pool = new Pool({
-  user,
-  host,
-  database,
-  password,
-  port,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 const generateAccessToken = (user) => {
@@ -36,6 +29,7 @@ const generateRefreshToken = async (userId) => {
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   try {
+    console.log("Saving refresh token for user:", userId, refreshToken);
     await pool.query(
       "INSERT INTO refresh_tokens (user_id,token,expires_at, revoked) VALUES ($1,$2,$3, false)",
       [userId, refreshToken, expiresAt]
